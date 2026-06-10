@@ -46,7 +46,10 @@ class TestEnvironment(unittest.TestCase):
 
         from openai import OpenAI, AuthenticationError
 
-        llm = OpenAI()
+        llm = OpenAI(
+            base_url="http://192.168.31.100:8888/v1",
+            api_key=os.getenv('OPENAI_API_KEY'),
+        )
         
         try:
             models = llm.models.list()

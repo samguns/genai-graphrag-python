@@ -15,15 +15,22 @@ neo4j_driver = GraphDatabase.driver(
 )
 neo4j_driver.verify_connectivity()
 
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "EMPTY")
+
 llm = OpenAILLM(
-    model_name="gpt-5-nano",
+    model_name="google/gemma-4-E4B-it",
+    api_key=OPENAI_API_KEY,
+    base_url=OPENAI_BASE_URL,
     model_params={
         "reasoning_effort": "minimal"
     }
 )
 
 embedder = OpenAIEmbeddings(
-    model="text-embedding-3-small"
+    model="google/embeddinggemma-300m",
+    api_key=OPENAI_API_KEY,
+    base_url="http://192.168.31.100:8889/v1",
 )
 
 kg_builder = SimpleKGPipeline(
