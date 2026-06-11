@@ -29,3 +29,4 @@ tqdm              == 4.67.3
 types-PyYAML      == 6.0.12.20250915
 typing_extensions == 4.15.0
 typing-inspection == 0.4.2
+wikipedia         == 1.4.0

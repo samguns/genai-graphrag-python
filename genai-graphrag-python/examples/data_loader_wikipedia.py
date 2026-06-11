@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import asyncio
+from typing import Dict, Optional, Union
 
 from neo4j import GraphDatabase
 from neo4j_graphrag.llm import OpenAILLM
@@ -15,7 +16,14 @@ from neo4j_graphrag.experimental.components.pdf_loader import DataLoader, PdfDoc
 from pathlib import Path
 import wikipedia
 from urllib.parse import quote
+from fsspec import AbstractFileSystem
 # end::import_loader[]
+
+class VLLMOpenAILLM(OpenAILLM):
+    supports_structured_output = False
+
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "EMPTY")
 
 neo4j_driver = GraphDatabase.driver(
     os.getenv("NEO4J_URI"),
@@ -23,20 +31,31 @@ neo4j_driver = GraphDatabase.driver(
 )
 neo4j_driver.verify_connectivity()
 
-llm = OpenAILLM(
-    model_name="gpt-5-nano",
+llm = VLLMOpenAILLM(
+    model_name="google/gemma-4-E4B-it",
+    api_key=OPENAI_API_KEY,
+    base_url=OPENAI_BASE_URL,
     model_params={
+        "max_tokens": 16384,
+        "temperature": 0,
         "reasoning_effort": "minimal"
     }
 )
 
 embedder = OpenAIEmbeddings(
-    model="text-embedding-3-small"
+    model="google/embeddinggemma-300m",
+    api_key=OPENAI_API_KEY,
+    base_url="http://192.168.31.100:8889/v1",
 )
 
 # tag::loader[]
 class WikipediaLoader(DataLoader):
-    async def run(self, filepath: Path) -> PdfDocument:
+    async def run(
+        self,
+        filepath: Union[str, Path],
+        metadata: Optional[Dict[str, str]] = None,
+        fs: Optional[Union[AbstractFileSystem, str]] = None,
+    ) -> PdfDocument:
 
         # Load the Wikipedia page
         page = wikipedia.page(filepath)
@@ -47,6 +66,7 @@ class WikipediaLoader(DataLoader):
             document_info=DocumentInfo(
                 path=str(filepath),
                 metadata={
+                    **(metadata or {}),
                     "url": f"https://en.wikipedia.org/w/index.php?title={quote(page.title)}",
                 }
             )
@@ -62,7 +82,8 @@ kg_builder = SimpleKGPipeline(
     neo4j_database=os.getenv("NEO4J_DATABASE"), 
     embedder=embedder, 
     from_pdf=True,
-    pdf_loader=data_loader
+    pdf_loader=data_loader,
+    schema="FREE",
 )
 # end::kg_builder[]
 

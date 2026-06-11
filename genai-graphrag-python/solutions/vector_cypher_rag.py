@@ -8,6 +8,10 @@ from neo4j_graphrag.retrievers import VectorCypherRetriever
 from neo4j_graphrag.llm import OpenAILLM
 from neo4j_graphrag.generation import GraphRAG
 
+
+class VLLMOpenAILLM(OpenAILLM):
+    supports_structured_output = False
+
 # Connect to Neo4j database
 driver = GraphDatabase.driver(
     os.getenv("NEO4J_URI"), 
@@ -17,8 +21,16 @@ driver = GraphDatabase.driver(
     )
 )
 
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "EMPTY")
+
 # Create embedder
-embedder = OpenAIEmbeddings(model="text-embedding-3-small")
+# embedder = OpenAIEmbeddings(model="text-embedding-3-small")
+embedder = OpenAIEmbeddings(
+    model="google/embeddinggemma-300m",
+    api_key=OPENAI_API_KEY,
+    base_url="http://192.168.31.100:8889/v1",
+)
 
 # Define retrieval query
 # tag::simple_retrieval_query[]
@@ -37,25 +49,25 @@ RETURN DISTINCT
 """
 # end::retrieval_query[]
 # tag::advanced_retrieval_query[]
-retrieval_query = """
-MATCH (node)-[:FROM_DOCUMENT]->(d)-[:PDF_OF]->(lesson)
-RETURN
-    node.text as text, score,
-    lesson.url as lesson_url,
-    collect { 
-        MATCH (node)<-[:FROM_CHUNK]-(entity)-[r]->(other)-[:FROM_CHUNK]->()
-        WITH toStringList([
-            [l IN labels(entity)
-                WHERE NOT l IN ["__KGBuilder__", "__Entity__"]][0],
-            entity.name, 
-            type(r), 
-            [l IN labels(other)
-                WHERE NOT l IN ["__KGBuilder__", "__Entity__"]][0],
-            other.name 
-            ]) as values
-        RETURN reduce(acc = "", item in values | acc || coalesce(item || ' ', ''))
-    } as associated_entities
-"""
+# retrieval_query = """
+# MATCH (node)-[:FROM_DOCUMENT]->(d)-[:PDF_OF]->(lesson)
+# RETURN
+#     node.text as text, score,
+#     lesson.url as lesson_url,
+#     collect { 
+#         MATCH (node)<-[:FROM_CHUNK]-(entity)-[r]->(other)-[:FROM_CHUNK]->()
+#         WITH toStringList([
+#             [l IN labels(entity)
+#                 WHERE NOT l IN ["__KGBuilder__", "__Entity__"]][0],
+#             entity.name, 
+#             type(r), 
+#             [l IN labels(other)
+#                 WHERE NOT l IN ["__KGBuilder__", "__Entity__"]][0],
+#             other.name 
+#             ]) as values
+#         RETURN reduce(acc = "", item in values | acc || coalesce(item || ' ', ''))
+#     } as associated_entities
+# """
 # end::advanced_retrieval_query[]
 
 # Create retriever
@@ -70,8 +82,14 @@ retriever = VectorCypherRetriever(
 # end::retriever[]
 
 #  Create the LLM
-llm = OpenAILLM(
-    model_name="gpt-5.2"
+llm = VLLMOpenAILLM(
+    model_name="google/gemma-4-E4B-it",
+    api_key=OPENAI_API_KEY,
+    base_url=OPENAI_BASE_URL,
+    model_params={
+        "max_tokens": 16384,
+        "temperature": 0,
+    }
 )
 
 # Create GraphRAG pipeline

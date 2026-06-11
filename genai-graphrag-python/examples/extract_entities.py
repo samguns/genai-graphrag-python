@@ -12,6 +12,12 @@ from neo4j_graphrag.experimental.components.types import (
 )
 from neo4j_graphrag.llm import OpenAILLM
 
+class VLLMOpenAILLM(OpenAILLM):
+    supports_structured_output = False
+
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "EMPTY")
+
 text = """
 Neo4j is a graph database that stores data in a graph structure.
 Data is stored as nodes and relationships instead of tables or documents.
@@ -22,12 +28,17 @@ Neo4j uses the graph structure to store data and is known as a *labeled property
 """
 
 extractor = LLMEntityRelationExtractor(
-    llm = OpenAILLM(
-        model_name="gpt-5-nano",
+    llm = VLLMOpenAILLM(
+        model_name="google/gemma-4-E4B-it",
+        api_key=OPENAI_API_KEY,
+        base_url=OPENAI_BASE_URL,
         model_params={
-            "reasoning_effort": "minimal"
-        }
-    )
+        "max_tokens": 16384,
+        "temperature": 0,
+        "reasoning_effort": "minimal",
+        "response_format": {"type": "json_object"},
+    }
+)
 )
 
 entities = asyncio.run(
